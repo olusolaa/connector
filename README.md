@@ -20,20 +20,32 @@
 
 ---
 
+## Requirements:
+
 ## Overview
 
-This gRPC service handles the lifecycle of "connectors" that integrate with Slack. It:
+The goal of this exercise is to implement a gRPC service that handles the lifecycle of "connectors" that integrate with
+Slack. A connector is a named entity that connects the system to a third party service such as slack.
 
-- Stores Slack tokens in AWS Secrets Manager (mocked via LocalStack).
+You are required to implement a connector service that does the following:
+
+- Stores static Slack tokens in AWS Secrets Manager (mocked via LocalStack).
+- Stores connector metadata in a PostgreSQL database.
+    - Workspace ID
+    - Tenant ID
+    - Created At
+    - Updated At
+    - Default Send Channel - Messages will be sent to this channel by default.
 - Provides endpoints to create, retrieve, and delete connectors.
-- Demonstrates sending a message to Slack using the stored token (no persistent connection required).
+- A static Go function outside the service that takes a connector id and a string simple message and sends it to the
+  default configured channel.
 
 ---
 
 ## Features
 
 - **gRPC** service with three methods:
-    - `CreateConnector`
+    - `CreateConnector` (You are given static access tokens. See [Bonus](#bonus) for OAuthV2)
     - `GetConnector`
     - `DeleteConnector`
 - **Secrets Manager** integration (LocalStack).
@@ -54,10 +66,9 @@ This gRPC service handles the lifecycle of "connectors" that integrate with Slac
         v                                 v
   LocalStack (Secrets Manager)       Slack (Real or Mock)
         |
-   +-----------+
-   |PostgreSQL |
-   | (optional)|
-   +-----------+
+   +------------+
+   | PostgreSQL |
+   +------------+
 ```
 
 ---
@@ -121,28 +132,10 @@ The service should listen on `:50051` (or another configured port).
 
 ---
 
-## Endpoints
-
-The gRPC service typically exposes these methods:
-
-1. **CreateConnector**
-
-- Accepts a connector name and Slack token.
-- Stores the token in Secrets Manager and optionally a database record.
-
-2. **GetConnector**
-
-- Retrieves a previously stored connector’s Slack token or metadata.
-
-3. **DeleteConnector**
-
-- Removes the connector’s Slack token from Secrets Manager and clears any DB records.
-
----
-
 ## Bonus
 
-- Implement Slack OAuth flow for real token retrieval.
+- Implement Slack OAuthV2 flow for real token retrieval.
+    - Implement gRPC method `GetOAuthV2URL`
 - Expand the connector functionality (attachments, threading, etc.).
 
 ---
