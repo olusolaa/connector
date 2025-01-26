@@ -1,89 +1,148 @@
-# CloudStore
-## Description
-Cloud environments typically have some hierarchy which is a recursive structure.
+# Connector Service (Go + Buf + LocalStack)
 
-Our goal is to store a cloud hierarchy in a postgres database and provide an endpoint to fetch a cloud hierarchy and an endpoint to store a cloud hierarchy - storing a cloud hierarchy is an "upsert" operation.
+- **Go** (for the service)
+- **Buf** (for Protobuf and gRPC code generation)
+- **LocalStack** (to mock AWS Secrets Manager)
+- **PostgreSQL** (optional, for additional data storage)
 
-Cloud hierarchies tend to change, and we need to deal with the following cases:
-- a new node in the hierarchy was added
-- an existing node was removed
-- an existing node was moved to a different parent
+## Table of Contents
 
-## Requirements
-### Database Modeling
-The goal of the exercise is to store a cloud hierarchy in a way that is efficient at large scale.
+1. [Overview](#overview)
+2. [Features](#features)
+3. [Architecture](#architecture)
+4. [Prerequisites](#prerequisites)
+5. [Setup](#setup)
+6. [Buf Installation](#buf-installation)
+7. [Protobuf Generation](#protobuf-generation)
+8. [Docker Compose](#docker-compose)
+9. [Running the Service](#running-the-service)
+10. [Endpoints](#endpoints)
 
-You need to design a schema and a storage strategy that will allow you to store and retrieve a cloud hierarchy with minimal operations on the database.
+---
 
-Also keep in mind that data integrity is important, so you need to make sure that the hierarchy is always correct based on the last update.
+## Overview
 
-### Endpoints
-- POST /hierarchy
-  - Request body: JSON object representing a cloud hierarchy
-  - Response: 200 OK
+This gRPC service handles the lifecycle of "connectors" that integrate with Slack. It:
 
+- Stores Slack tokens in AWS Secrets Manager (mocked via LocalStack).
+- Provides endpoints to create, retrieve, and delete connectors.
+- Demonstrates sending a message to Slack using the stored token (no persistent connection required).
 
-- GET /hierarchy/{node_id}
-  - Response: JSON object representing a cloud hierarchy starting from the node with the given id
+---
 
-### Server
-You are given a docker-compose application with a running Python server (on port 8081) and a running Go server (running on port 8080), you may implement either of them.
+## Features
 
-Each server is already exposing 1 endpoint of some mock table so you have a running reference.
+- **gRPC** service with three methods:
+    - `CreateConnector`
+    - `GetConnector`
+    - `DeleteConnector`
+- **Secrets Manager** integration (LocalStack).
+- **Slack integration** to send messages.
+- **Optional PostgreSQL** usage for tracking connector metadata.
 
-### Database
-You are given a running postgres database with 1 mock table for reference.
+---
 
-The database is initialized with the `init.sql` file, there you can add your additional tables.
+## Architecture
 
-## Examples
-An example of a cloud hierarchy is:
 ```
-{
-  "id": 1,
-  "type": "management_group",
-  "children": [
-    {
-      "id": 2,
-      "type": "management_group",
-      "children": []
-    },
-    {
-      "id": 3,
-      "type": "subscription",
-      "children": [
-        {
-          "id": 4,
-          "type": "subscription",
-          "children": [
-            {
-              "id": 5,
-              "type": "resource_group",
-              "children": []
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 6,
-      "type": "subscription",
-      "children": [
-        {
-          "id": 7,
-          "type": "resource_group",
-          "children": []
-        }
-      ]
-    }
-  ]
-}
+  +-----------------+         +--------------------+
+  | gRPC Client     | ----->  | Slack Connector    |
+  | (e.g., grpcurl) |         | Service (Go + Buf) |
+  +-----------------+         +--------------------+
+        |                                 |
+        | (AWS SDK)                       | (Slack API)
+        v                                 v
+  LocalStack (Secrets Manager)       Slack (Real or Mock)
+        |
+   +-----------+
+   |PostgreSQL |
+   | (optional)|
+   +-----------+
 ```
 
-### Testing
+---
 
-You can find the "tests" folder that contains 2 main things:
-- "objects" folder containing some sample hierarchies for testing
-- "run_tests.py" script that will run some tests, it will store each hierarchy and then fetch it to compare the results.
+## Prerequisites
 
-You can add tests as you see fit. (but you can't delete existing tests)
+- **Go** (>= 1.18 recommended)
+- **Docker**
+- **Buf** (for protobuf generation)
+- **Slack token** (real or mocked)
+
+---
+
+## Setup
+
+### Buf Installation
+
+Follow the [official Buf installation guide](https://docs.buf.build/installation) for your OS.
+
+### Protobuf Generation
+
+From the repository root, run:
+
+```bash
+buf generate
+```
+
+This will generate Go code into the configured output folder (e.g., `gen/`).
+
+### Docker Compose
+
+Spin up LocalStack and PostgreSQL using the provided docker-compose.yml like this:
+
+```bash
+docker-compose up -d
+```
+
+---
+
+## Running the Service
+
+1. Start LocalStack (and Postgres if needed):
+
+   ```bash
+   docker-compose up -d
+   ```
+
+2. Generate protobuf stubs (if you haven’t yet):
+
+   ```bash
+   buf generate
+   ```
+
+3. Run the server:
+
+   ```bash
+   go run cmd/server/main.go
+   ```
+
+The service should listen on `:50051` (or another configured port).
+
+---
+
+## Endpoints
+
+The gRPC service typically exposes these methods:
+
+1. **CreateConnector**
+
+- Accepts a connector name and Slack token.
+- Stores the token in Secrets Manager and optionally a database record.
+
+2. **GetConnector**
+
+- Retrieves a previously stored connector’s Slack token or metadata.
+
+3. **DeleteConnector**
+
+- Removes the connector’s Slack token from Secrets Manager and clears any DB records.
+
+---
+
+## Bonus
+
+- Implement Slack OAuth flow for real token retrieval.
+- Expand the connector functionality (attachments, threading, etc.).
+
+---
