@@ -1,48 +1,36 @@
 services:
-  postgres:
-    build:
-      context: ./postgres
-      dockerfile: Dockerfile
-    container_name: postgres-db
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
     environment:
-      POSTGRES_USER: aryon
-      POSTGRES_PASSWORD: aryon
-      POSTGRES_DB: aryondb
+      SERVICES: secretsmanager
+      DEBUG: 1
+      DEFAULT_REGION: us-east-2
+    volumes:
+      - localstack_data:/tmp/localstack
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine  # Using Alpine for smaller image
     ports:
       - "5432:5432"
-    networks:
-      - aryon-network
-
-  python-server:
-    build:
-      context: ./python-server
-      dockerfile: Dockerfile
-    container_name: python-api
-    ports:
-      - "8081:8081"
     environment:
-      DATABASE_URL: postgresql://aryon:aryon@postgres:5432/aryondb?sslmode=disable
-      FLASK_APP: app.py
-      FLASK_ENV: development
-    depends_on:
-      - postgres
-    networks:
-      - aryon-network
+      POSTGRES_USER: ${POSTGRES_USER:-aryon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aryon}
+      POSTGRES_DB: ${POSTGRES_DB:-aryon}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
 
-  go-server:
-    build:
-      context: ./go-server
-      dockerfile: Dockerfile
-    container_name: go-api
-    ports:
-      - "8080:8080"
-    environment:
-      DATABASE_URL: postgresql://aryon:aryon@postgres:5432/aryondb?sslmode=disable
-    depends_on:
-      - postgres
-    networks:
-      - aryon-network
+volumes:
+  localstack_data:
+    name: aryon_localstack_data
+  postgres_data:
+    name: aryon_postgres_data
 
 networks:
-  aryon-network:
-    driver: bridge
+  default:
+    name: aryon_network
