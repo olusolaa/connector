@@ -20,7 +20,7 @@ services:
     environment:
       POSTGRES_USER: aryon
       POSTGRES_PASSWORD: aryon
-      POSTGRES_DB: aryon
+      POSTGRES_DB: aryondb
       PGDATA: /data/postgres
     volumes:
       - postgres_data:/data/postgres
