@@ -2,34 +2,34 @@ services:
   localstack:
     image: localstack/localstack:latest
     ports:
-      - "4566:4566"
+      - "127.0.0.1:4566:4566"            # LocalStack Gateway
+      - "127.0.0.1:4510-4559:4510-4559"  # external services port range
     environment:
       SERVICES: secretsmanager
       DEBUG: 1
       DEFAULT_REGION: us-east-2
     volumes:
-      - localstack_data:/tmp/localstack
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
   postgres:
-    image: postgres:17-alpine  # Using Alpine for smaller image
+    image: postgres:17-alpine
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: aryon
       POSTGRES_PASSWORD: aryon
       POSTGRES_DB: aryon
-      PGDATA: /var/lib/postgresql/data/pgdata
+      PGDATA: /data/postgres
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/data/postgres
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     restart: unless-stopped
 
 volumes:
   localstack_data:
-    name: aryon_localstack_data
   postgres_data:
-    name: aryon_postgres_data
 
 networks:
   default:
