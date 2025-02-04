@@ -35,21 +35,22 @@ You are required to implement a connector service that does the following:
     - Tenant ID
     - Created At
     - Updated At
-    - Default Send Channel - Messages will be sent to this channel by default.
+    - Default Send Channel ID - Messages will be sent to this channel by default.
 - Provides endpoints to create, retrieve, and delete connectors.
 - A static Go function outside the service that takes a connector id and a string simple message and sends it to the
-  default configured channel.
+  default configured channel. In addition to all other configuration parameters, such as aws config that is connected to localstack.
+  - You are free to model the configuration parameters as you see fit.
 
 ---
 
 ## Features
 
 - **gRPC** service with three methods:
-    - `CreateConnector` (You are given static access tokens. See [Bonus](#bonus) for OAuthV2)
+    - `CreateConnector` (You are given static access tokens and the default channel name(which needs to be resolved to its ID). See [Bonus](#bonus) for OAuthV2)
     - `GetConnector`
     - `DeleteConnector`
 - **Secrets Manager** integration (LocalStack).
-- **Slack integration** to send messages.
+- **Slack integration** to send messages using an already created connector.
 - **Optional PostgreSQL** usage for tracking connector metadata.
 
 ---
