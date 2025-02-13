@@ -65,6 +65,7 @@ func TestService_CreateConnector(t *testing.T) {
 				TenantID:    "tenant123",
 			},
 			setupMocks: func(repo *mocks2.MockConnectorRepository, sm *mocks2.MockSecretsManager, sc *mocks2.MockSlackClient) {
+				// No mock expectations needed as validation should fail before any method calls
 			},
 			expectError: true,
 			errorCode:   codes.InvalidArgument,
