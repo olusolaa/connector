@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+package connector.v1;
+
+option go_package = "github.com/connector-recruitment/proto/gen/connector/v1;connectorv1";
+
+import "google/protobuf/timestamp.proto";
+
+import "validate/validate.proto";
+
+message Connector {
+  string id = 1 [(validate.rules).string = {
+    pattern: "^[0-9a-fA-F\\-]{36}$"
+  }];
+
+  string workspace_id = 2 [(validate.rules).string = {
+    pattern: "^[A-Za-z0-9_-]+$",
+    min_len: 1,
+    max_len: 32
+  }];
+
+  string tenant_id = 3 [(validate.rules).string = {
+    pattern: "^[A-Za-z0-9_-]+$",
+    min_len: 1,
+    max_len: 32
+  }];
+
+  string default_channel_id = 4 [(validate.rules).string = {
+    pattern: "^[A-Za-z0-9_-]+$",
+    min_len: 1,
+    max_len: 100
+  }];
+
+
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+
+  string secret_version = 7 [(validate.rules).string = {
+    min_len: 1
+  }];
+}
+
+message CreateConnectorRequest {
+  string workspace_id = 1 [(validate.rules).string = {
+    pattern: "^[A-Za-z0-9_-]+$",
+    min_len: 1,
+    max_len: 32
+  }];
+
+  string tenant_id = 2 [(validate.rules).string = {
+    pattern: "^[A-Za-z0-9_-]+$",
+    min_len: 1,
+    max_len: 32
+  }];
+
+  string token = 3 [(validate.rules).string = {
+    min_len: 4,
+    max_len: 512
+  }];
+
+  string default_channel_name = 4 [(validate.rules).string = {
+    pattern: "^[A-Za-z0-9_-]+$",
+    min_len: 1,
+    max_len: 100
+  }];
+}
+
+message CreateConnectorResponse {
+  Connector connector = 1;
+}
+
+message GetConnectorRequest {
+  string id = 1 [(validate.rules).string = {
+    pattern: "^[0-9a-fA-F\\-]{36}$"
+  }];
+}
+
+message GetConnectorResponse {
+  Connector connector = 1;
+}
+
+message DeleteConnectorRequest {
+  string id = 1 [(validate.rules).string = {
+    pattern: "^[0-9a-fA-F\\-]{36}$"
+  }];
+
+  string workspace_id = 2 [(validate.rules).string = {
+    pattern: "^[A-Za-z0-9_-]+$",
+    min_len: 1,
+    max_len: 32
+  }];
+
+  string tenant_id = 3 [(validate.rules).string = {
+    pattern: "^[A-Za-z0-9_-]+$",
+    min_len: 1,
+    max_len: 32
+  }];
+}
+
+message DeleteConnectorResponse {
+  string message = 1;
+}
+
+message GetOAuthV2URLRequest {
+  string redirect_uri = 1 [(validate.rules).string = {
+    min_len: 1,
+    max_len: 1024
+  }];
+}
+
+message GetOAuthV2URLResponse {
+  string url = 1;
+}
+
+message ExchangeOAuthCodeRequest {
+  string code = 1 [(validate.rules).string = {
+    min_len: 1,
+    max_len: 512
+  }];
+}
+
+message ExchangeOAuthCodeResponse {
+  string access_token = 1;
+}
+
+service ConnectorService {
+  rpc CreateConnector(CreateConnectorRequest) returns (CreateConnectorResponse);
+  rpc GetConnector(GetConnectorRequest) returns (GetConnectorResponse);
+  rpc DeleteConnector(DeleteConnectorRequest) returns (DeleteConnectorResponse);
+  rpc GetOAuthV2URL(GetOAuthV2URLRequest) returns (GetOAuthV2URLResponse);
+  rpc ExchangeOAuthCode(ExchangeOAuthCodeRequest) returns (ExchangeOAuthCodeResponse);
+}
