@@ -57,7 +57,7 @@ func (rs *RotationService) rotateSecrets(ctx context.Context) {
 			connCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 
 			if err := rs.rotateConnectorSecret(connCtx, connector); err != nil {
-				logger.Error().
+				logger.Warn().
 					Err(err).
 					Str("connector_id", connector.ID.String()).
 					Msg("Error rotating secret for connector")
@@ -94,7 +94,7 @@ func (rs *RotationService) rotateConnectorSecret(ctx context.Context, connector 
 
 	if err := rs.repo.UpdateConnector(ctx, connector.ID, newToken); err != nil {
 		if rollbackErr := rs.secretsManager.StoreToken(ctx, secretName, connector.SecretVersion); rollbackErr != nil {
-			logger.Error().
+			logger.Warn().
 				Err(rollbackErr).
 				Str("connector_id", connector.ID.String()).
 				Msg("Failed to rollback secret for connector")

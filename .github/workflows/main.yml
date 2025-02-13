@@ -30,7 +30,7 @@ jobs:
           version: latest
 
       - name: Run golangci-lint
-        run: golangci-lint run --skip-files "proto/gen/.*" ./...
+        run: golangci-lint run --skip-dirs "^proto/gen" --skip-files ".*_pb.go" ./...
 
   test:
     name: Test
