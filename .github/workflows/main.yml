@@ -30,7 +30,7 @@ jobs:
           version: latest
 
       - name: Run golangci-lint
-        run: golangci-lint run ./...
+        run: golangci-lint run --skip-files "proto/gen/.*" ./...
 
   test:
     name: Test
@@ -144,4 +144,4 @@ jobs:
         with:
           service-id: ${{ secrets.RENDER_SERVICE_ID }}
           api-key: ${{ secrets.RENDER_API_KEY }}
-          wait-for-success: true 
+          wait-for-success: true

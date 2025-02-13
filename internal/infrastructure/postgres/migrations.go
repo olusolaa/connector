@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -23,11 +24,20 @@ func RunMigrations(db *sql.DB, migrationsDir string) error {
 		if err != nil {
 			return fmt.Errorf("failed to get absolute path for migrations directory: %w", err)
 		}
-		if !filepath.HasPrefix(absPath, absMigrationsDir) {
+
+		cleanAbsPath := filepath.Clean(absPath)
+		cleanMigrationsDir := filepath.Clean(absMigrationsDir)
+
+		rel, err := filepath.Rel(cleanMigrationsDir, cleanAbsPath)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			return fmt.Errorf("migration file %s is outside of migrations directory", file)
 		}
 
-		sqlBytes, err := os.ReadFile(file)
+		if filepath.Ext(absPath) != ".sql" {
+			return fmt.Errorf("migration file %s does not have .sql extension", file)
+		}
+
+		sqlBytes, err := os.ReadFile(absPath)
 		if err != nil {
 			return fmt.Errorf("failed to read migration file %s: %w", file, err)
 		}
