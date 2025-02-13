@@ -45,7 +45,6 @@ func NewService(repo domain.ConnectorRepository, sm domain.SecretsManager, sc do
 }
 
 func (s *Service) CreateConnector(ctx context.Context, input CreateInput) (*domain.Connector, error) {
-	// Validate input
 	if len(input.WorkspaceID) < 3 || len(input.TenantID) == 0 || len(input.Token) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "invalid input: workspace_id, tenant_id, and token are required")
 	}

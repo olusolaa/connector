@@ -15,6 +15,18 @@ func RunMigrations(db *sql.DB, migrationsDir string) error {
 		return fmt.Errorf("failed to list migration files: %w", err)
 	}
 	for _, file := range files {
+		absPath, err := filepath.Abs(file)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for %s: %w", file, err)
+		}
+		absMigrationsDir, err := filepath.Abs(migrationsDir)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for migrations directory: %w", err)
+		}
+		if !filepath.HasPrefix(absPath, absMigrationsDir) {
+			return fmt.Errorf("migration file %s is outside of migrations directory", file)
+		}
+
 		sqlBytes, err := os.ReadFile(file)
 		if err != nil {
 			return fmt.Errorf("failed to read migration file %s: %w", file, err)

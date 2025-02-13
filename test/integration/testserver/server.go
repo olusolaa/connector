@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	httpTransport "github.com/connector-recruitment/internal/transport/http"
 	"io"
 	"log"
 	"net"
@@ -14,6 +13,10 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+
+	httpTransport "github.com/connector-recruitment/internal/transport/http"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -30,6 +33,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 )
 
@@ -65,12 +69,16 @@ func NewPostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 	}
 	host, err := container.Host(ctx)
 	if err != nil {
-		container.Terminate(ctx)
+		if err := container.Terminate(ctx); err != nil {
+			return nil, fmt.Errorf("failed to terminate container after host error: %v. Original error: %w", err, err)
+		}
 		return nil, fmt.Errorf("failed to get Postgres container host: %w", err)
 	}
 	port, err := container.MappedPort(ctx, "5432")
 	if err != nil {
-		container.Terminate(ctx)
+		if err := container.Terminate(ctx); err != nil {
+			return nil, fmt.Errorf("failed to terminate container after port error: %v. Original error: %w", err, err)
+		}
 		return nil, fmt.Errorf("failed to get Postgres container port: %w", err)
 	}
 	dsn := fmt.Sprintf("postgres://test:test@%s:%s/testdb?sslmode=disable", host, port.Port())
@@ -120,7 +128,9 @@ func NewSecretsManagerContainer(ctx context.Context) (*SecretsManagerContainer, 
 
 	mappedPort, err := container.MappedPort(ctx, "4566")
 	if err != nil {
-		container.Terminate(ctx)
+		if err := container.Terminate(ctx); err != nil {
+			return nil, fmt.Errorf("failed to terminate container after port error: %v. Original error: %w", err, err)
+		}
 		return nil, fmt.Errorf("failed to get container port: %w", err)
 	}
 
@@ -140,7 +150,9 @@ func NewSecretsManagerContainer(ctx context.Context) (*SecretsManagerContainer, 
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
 	)
 	if err != nil {
-		container.Terminate(ctx)
+		if err := container.Terminate(ctx); err != nil {
+			return nil, fmt.Errorf("failed to terminate container after endpoint error: %v. Original error: %w", err, err)
+		}
 		return nil, fmt.Errorf("failed to create AWS config: %w", err)
 	}
 
@@ -191,13 +203,17 @@ func NewRedisContainer(ctx context.Context) (*RedisContainer, *redis.Client, err
 
 	mappedPort, err := container.MappedPort(ctx, "6379")
 	if err != nil {
-		container.Terminate(ctx)
+		if err := container.Terminate(ctx); err != nil {
+			return nil, nil, fmt.Errorf("failed to terminate container after port error: %v. Original error: %w", err, err)
+		}
 		return nil, nil, fmt.Errorf("failed to get Redis container port: %w", err)
 	}
 
 	host, err := container.Host(ctx)
 	if err != nil {
-		container.Terminate(ctx)
+		if err := container.Terminate(ctx); err != nil {
+			return nil, nil, fmt.Errorf("failed to terminate container after host error: %v. Original error: %w", err, err)
+		}
 		return nil, nil, fmt.Errorf("failed to get Redis container host: %w", err)
 	}
 
@@ -207,7 +223,9 @@ func NewRedisContainer(ctx context.Context) (*RedisContainer, *redis.Client, err
 		Addr: address,
 	})
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		container.Terminate(ctx)
+		if err := container.Terminate(ctx); err != nil {
+			return nil, nil, fmt.Errorf("failed to terminate container after host error: %v. Original error: %w", err, err)
+		}
 		return nil, nil, fmt.Errorf("failed to ping Redis: %w", err)
 	}
 
@@ -291,8 +309,12 @@ func SetupIntegrationTestServer(t *testing.T) *IntegrationTestServer {
 	// gRPC Setup
 	//---------------------------------------------------------------------
 	grpcHandler := grpcHandler.NewHandler(svc)
+
+	grpcServer := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+	)
+
 	bufListener := bufconn.Listen(bufSize)
-	grpcServer := grpc.NewServer()
 	conV1.RegisterConnectorServiceServer(grpcServer, grpcHandler)
 
 	go func() {
@@ -304,7 +326,11 @@ func SetupIntegrationTestServer(t *testing.T) *IntegrationTestServer {
 	dialer := func(context.Context, string) (net.Conn, error) {
 		return bufListener.Dial()
 	}
-	conn, err := grpc.DialContext(ctx, "bufnet", grpc.WithContextDialer(dialer), grpc.WithInsecure())
+
+	conn, err := grpc.NewClient("passthrough://bufnet",
+		grpc.WithContextDialer(dialer),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	if err != nil {
 		t.Fatalf("failed to dial bufnet: %v", err)
 	}
@@ -327,12 +353,18 @@ func SetupIntegrationTestServer(t *testing.T) *IntegrationTestServer {
 	cleanup := func() {
 		httpTestServer.Close()
 
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			t.Errorf("failed to close gRPC connection: %v", err)
+		}
 		grpcServer.Stop()
-		bufListener.Close()
+		if err := bufListener.Close(); err != nil {
+			t.Errorf("failed to close bufnet listener: %v", err)
+		}
 
 		if db != nil {
-			db.Close()
+			if err := db.Close(); err != nil {
+				t.Errorf("failed to close database connection: %v", err)
+			}
 		}
 		if err := secretsContainer.Cleanup(ctx); err != nil {
 			t.Errorf("failed to cleanup LocalStack container: %v", err)

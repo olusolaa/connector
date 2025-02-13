@@ -33,9 +33,8 @@ func NewServer(svc *connector.Service, grpcPort string) (*grpc.Server, net.Liste
 	server := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			rateLimitingInterceptor,
-			otelgrpc.UnaryServerInterceptor(),
 		),
-		grpc.StreamInterceptor(otelgrpc.StreamServerInterceptor()),
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	)
 
 	handler := NewHandler(svc)
