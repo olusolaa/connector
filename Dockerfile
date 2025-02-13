@@ -48,15 +48,25 @@ RUN chmod +x /app/start.sh
 # ------------------------------------------------------------
 FROM debian:bookworm-slim AS final
 
-LABEL maintainer="olusolaa <olusolae@gmail.com" \
+LABEL maintainer="olusolaa <olusolae@gmail.com>" \
       version="1.0.0"
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates netcat-openbsd curl \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        netcat-openbsd \
+        curl \
+        bash \
+        openssl \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m appuser
+
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
 
 COPY --from=builder /app/myapp /app/myapp
 COPY --from=builder /app/start.sh /app/start.sh

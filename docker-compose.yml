@@ -4,7 +4,6 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - .:/app
       - go-cache:/go
     ports:
       - "${GRPC_PORT:-50051}:50051"  # gRPC server
