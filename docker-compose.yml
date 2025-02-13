@@ -1,22 +1,66 @@
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+      - go-cache:/go
+    ports:
+      - "${GRPC_PORT:-50051}:50051"  # gRPC server
+      - "${HTTP_PORT:-8080}:8080"    # HTTP server
+    environment:
+      - SLACK_CLIENT_ID=${SLACK_CLIENT_ID:-7656730043137.8419590983429}
+      - SLACK_CLIENT_SECRET=${SLACK_CLIENT_SECRET:-374add2fd9704aa7f4e98b262e1e3583}
+      - SLACK_REDIRECT_URL=${SLACK_REDIRECT_URL:-https://localhost:${HTTP_PORT:-8080}/oauth/callback}
+      - SLACK_BASE_URL=https://slack.com/api
+      - DB_DSN=postgres://aryon:aryon@postgres:5432/aryondb?sslmode=disable
+      - AWS_REGION=us-east-1
+      - AWS_ENDPOINT=http://localstack:4566
+      - GRPC_PORT=50051
+      - HOST_GRPC_PORT=${GRPC_PORT:-50051}
+      - HOST_HTTP_PORT=${HTTP_PORT:-8080}
+      - REDIS_ADDR=redis:6379
+      - HOST_DB_DSN=postgres://aryon:aryon@localhost:${POSTGRES_PORT:-5432}/aryondb?sslmode=disable
+      - HOST_REDIS_ADDR=localhost:${REDIS_PORT:-6379}
+      - HOST_AWS_ENDPOINT=http://localhost:${LOCALSTACK_PORT:-4566}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "chmod +x /app/start.sh && /app/start.sh"
+
   localstack:
     image: localstack/localstack:latest
     ports:
-      - "127.0.0.1:4566:4566"            # LocalStack Gateway
-      - "127.0.0.1:4510-4559:4510-4559"  # external services port range
+      - "${LOCALSTACK_PORT:-4566}:4566"  # Only expose if you need direct access
     environment:
-      SERVICES: secretsmanager
-      DEBUG: 1
-      DEFAULT_REGION: us-east-2
+      - SERVICES=secretsmanager
+      - DEBUG=1
+      - DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - LAMBDA_EXECUTOR=docker
+      - PERSISTENCE=1
+      - LS_LOG=trace
     volumes:
       - localstack_data:/var/lib/localstack
-      - /var/run/docker.sock:/var/run/docker.sock
-    restart: unless-stopped
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   postgres:
     image: postgres:17-alpine
     ports:
-      - "127.0.0.1:5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"  # Only expose if you need direct access
     environment:
       POSTGRES_USER: aryon
       POSTGRES_PASSWORD: aryon
@@ -25,12 +69,37 @@ services:
     volumes:
       - postgres_data:/data/postgres
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aryon -d aryondb"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"  # Only expose if you need direct access
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    depends_on:
+      - app
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./otel-collector-config.yml:/etc/otel-collector-config.yml
+    command: ["--config=/etc/otel-collector-config.yml"]
 
 volumes:
   localstack_data:
   postgres_data:
-
-networks:
-  default:
-    name: aryon_network
+  redis_data:
+  go-cache:
