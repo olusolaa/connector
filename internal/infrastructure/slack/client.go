@@ -154,14 +154,7 @@ func (c *Client) ExchangeCode(ctx context.Context, code string) (string, error) 
 	data.Set("client_secret", c.clientSecret)
 	data.Set("redirect_uri", c.redirectURL)
 
-	var result struct {
-		Ok          bool   `json:"ok"`
-		Error       string `json:"error"`
-		AccessToken string `json:"access_token"`
-		AuthedUser  struct {
-			AccessToken string `json:"access_token"`
-		} `json:"authed_user"`
-	}
+	var result Result
 
 	var lastErr error
 	for attempt := 0; attempt <= c.retryMax; attempt++ {
