@@ -2,6 +2,8 @@ package connector
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,8 +11,6 @@ import (
 	"github.com/connector-recruitment/pkg/logger"
 	"github.com/connector-recruitment/pkg/resilience"
 	"github.com/google/uuid"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type ServiceOption func(*Service)
@@ -29,12 +29,12 @@ type Service struct {
 	oauthManager   *OAuthStateManager
 }
 
-func NewService(repo domain.ConnectorRepository, sm domain.SecretsManager, sc domain.SlackClient, opts ...ServiceOption) *Service {
+func NewService(repo domain.ConnectorRepository, sm domain.SecretsManager, sc domain.SlackClient, cb *resilience.CircuitBreaker, opts ...ServiceOption) *Service {
 	s := &Service{
 		repo:           repo,
 		secretsManager: sm,
 		slackClient:    sc,
-		cb:             resilience.New("github.com/connector-recruitment"),
+		cb:             cb,
 	}
 
 	for _, opt := range opts {
@@ -46,7 +46,7 @@ func NewService(repo domain.ConnectorRepository, sm domain.SecretsManager, sc do
 
 func (s *Service) CreateConnector(ctx context.Context, input CreateInput) (*domain.Connector, error) {
 	if len(input.WorkspaceID) < 3 || len(input.TenantID) == 0 || len(input.Token) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "invalid input: workspace_id, tenant_id, and token are required")
+		return nil, fmt.Errorf("invalid input: %w", ErrInvalidInput)
 	}
 
 	result, err := s.cb.Execute(ctx, func() (interface{}, error) {
@@ -96,7 +96,7 @@ func (s *Service) CreateConnector(ctx context.Context, input CreateInput) (*doma
 	})
 	if err != nil {
 		logger.Error().Err(err).Msg("Circuit breaker execution failed for CreateConnector")
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, fmt.Errorf("failed to create connector: %w", err)
 	}
 
 	return result.(*domain.Connector), nil
@@ -106,25 +106,32 @@ func (s *Service) GetConnector(ctx context.Context, id uuid.UUID) (*domain.Conne
 	conn, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		logger.Warn().Err(err).Str("connector_id", id.String()).Msg("Connector not found")
-		return nil, status.Error(codes.NotFound, "connector not found")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("failed to get connector: %w", ErrNotFound)
+		}
+		return nil, fmt.Errorf("failed to get connector: %w", err)
 	}
 	return conn, nil
 }
 
 func (s *Service) DeleteConnector(ctx context.Context, id uuid.UUID, workspaceID, tenantID string) error {
-	logger.Info().Str("connector_id", id.String()).Msg("Attempting to delete connector")
+	logger.Info().
+		Str("connector_id", id.String()).
+		Msg("Attempting to delete connector")
 
 	if err := s.repo.Delete(ctx, id); err != nil {
 		logger.Warn().Err(err).Str("connector_id", id.String()).Msg("Failed to delete connector in DB")
-		return status.Error(codes.NotFound, "failed to delete connector")
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("failed to delete connector: %w", ErrNotFound)
+		}
+		return fmt.Errorf("failed to delete connector: %w", err)
 	}
 
 	secretName := fmt.Sprintf("connector-%s-%s", workspaceID, tenantID)
 	if err := s.secretsManager.DeleteToken(ctx, secretName); err != nil {
 		logger.Error().Err(err).Str("secret_name", secretName).Msg("Failed to delete token from Secrets Manager")
-		return status.Error(codes.Internal, "failed to delete secret")
+		return fmt.Errorf("failed to delete token from Secrets Manager: %w", handleAWSError(err))
 	}
-
 	return nil
 }
 

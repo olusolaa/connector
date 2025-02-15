@@ -2,8 +2,8 @@ package resilience
 
 import (
 	"context"
-	"time"
 
+	"github.com/connector-recruitment/internal/app/config"
 	"github.com/sony/gobreaker"
 )
 
@@ -11,12 +11,12 @@ type CircuitBreaker struct {
 	cb *gobreaker.CircuitBreaker
 }
 
-func New(name string) *CircuitBreaker {
+func New(name string, cfg *config.Config) *CircuitBreaker {
 	settings := gobreaker.Settings{
 		Name:        name,
 		MaxRequests: 5,
-		Interval:    time.Minute,
-		Timeout:     30 * time.Second,
+		Interval:    cfg.CircuitBreakerInterval,
+		Timeout:     cfg.CircuitBreakerTimeout,
 		ReadyToTrip: func(counts gobreaker.Counts) bool {
 			return counts.ConsecutiveFailures > 5
 		},

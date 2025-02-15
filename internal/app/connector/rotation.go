@@ -81,8 +81,8 @@ func (rs *RotationService) rotateSecrets(ctx context.Context) {
 	logger.Info().Msg("Secret rotation completed.")
 }
 
-func (rs *RotationService) rotateConnectorSecret(ctx context.Context, connector *domain.Connector) error {
-	newToken, err := generateNewTokenForConnector(*connector)
+func (rs *RotationService) rotateConnectorSecret(ctx context.Context, connector domain.Connector) error {
+	newToken, err := generateNewTokenForConnector(connector)
 	if err != nil {
 		return fmt.Errorf("failed to generate new token: %w", err)
 	}
