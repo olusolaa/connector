@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"github.com/connector-recruitment/internal/infrastructure/redis"
+	"github.com/connector-recruitment/pkg/resilience"
 	"net/http"
 	"os/signal"
 	"syscall"
@@ -18,7 +19,6 @@ import (
 	httpTransport "github.com/connector-recruitment/internal/transport/http"
 	"github.com/connector-recruitment/pkg/logger"
 	"github.com/connector-recruitment/pkg/observability"
-	"github.com/redis/go-redis/v9"
 
 	_ "github.com/lib/pq"
 )
@@ -42,31 +42,26 @@ func main() {
 		}
 	}()
 
-	db, err := sql.Open("postgres", cfg.DBDSN)
+	db, err := pgRepo.InitDb(ctx, cfg.DBDSN)
 	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to connect to Postgres")
+		logger.Fatal().Err(err).Msg("failed to initialize database")
 	}
 	defer db.Close()
 
-	if err = db.Ping(); err != nil {
-		logger.Fatal().Err(err).Msg("failed to ping Postgres")
-	}
-
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: cfg.RedisAddr,
-		DB:   0,
-	})
-	defer redisClient.Close()
-
-	if err := redisClient.Ping(ctx).Err(); err != nil {
+	redisClient, err := redis.IntClient(ctx, cfg.RedisAddr)
+	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to connect to Redis")
 	}
+	defer redisClient.Close()
 
 	awsCfg, err := config.LoadAWSConfig(cfg.AWSRegion, cfg.AWSEndpoint)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to load AWS config")
 	}
-	smClient := awsSM.NewClient(awsCfg)
+	smClient := awsSM.NewClient(awsCfg,
+		awsSM.WithRetryMaxAttempts(cfg.AWSRetryMaxAttempts),
+		awsSM.WithRetryMaxBackoff(cfg.AWSRetryMaxBackoff),
+	)
 
 	slackClient := slackInfra.NewSlackClient(
 		cfg.SlackBaseURL,
@@ -74,18 +69,21 @@ func main() {
 		cfg.SlackClientSecret,
 		cfg.SlackRedirectURL,
 		cfg.SlackScopes,
+		slackInfra.WithRetry(cfg.SlackRetryMax, cfg.SlackRetryWait),
+		slackInfra.WithRateLimit(cfg.SlackRateLimitRPS, cfg.SlackRateLimitBurst),
 	)
 
 	repository := pgRepo.NewConnectorRepository(db)
-	oauthManager := appConnector.NewOAuthStateManager(redisClient, 15*time.Minute)
-	service := appConnector.NewService(repository, smClient, slackClient, appConnector.WithOAuthManager(oauthManager))
+	oauthManager := appConnector.NewOAuthStateManager(redisClient, cfg.OAuthStateTimeout)
+	service := appConnector.NewService(repository, smClient, slackClient,
+		resilience.New("github.com/connector-recruitment", cfg), appConnector.WithOAuthManager(oauthManager))
 
 	grpcServer, lis, err := grpcTransport.NewServer(service, cfg.GRPCPort)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to create gRPC server")
 	}
 
-	httpServer := httpTransport.NewHTTPServer(service, oauthManager)
+	httpServer := httpTransport.NewHTTPServer(service, oauthManager, cfg)
 
 	errCh := make(chan error, 2)
 

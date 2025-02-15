@@ -29,7 +29,7 @@ func main() {
 
 	ctx := context.Background()
 
-	db, err := pgRepo.InitDatabase(ctx, cfg.DBDSN)
+	db, err := pgRepo.InitDb(ctx, cfg.DBDSN)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to initialize database")
 	}
@@ -39,7 +39,10 @@ func main() {
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to load AWS config")
 	}
-	smClient := awsSM.NewClient(awsCfg)
+	smClient := awsSM.NewClient(awsCfg,
+		awsSM.WithRetryMaxAttempts(cfg.AWSRetryMaxAttempts),
+		awsSM.WithRetryMaxBackoff(cfg.AWSRetryMaxBackoff),
+	)
 
 	slackClient := slackInfra.NewSlackClient(
 		cfg.SlackBaseURL,
@@ -47,6 +50,8 @@ func main() {
 		cfg.SlackClientSecret,
 		cfg.SlackRedirectURL,
 		cfg.SlackScopes,
+		slackInfra.WithRetry(cfg.SlackRetryMax, cfg.SlackRetryWait),
+		slackInfra.WithRateLimit(cfg.SlackRateLimitRPS, cfg.SlackRateLimitBurst),
 	)
 
 	err = slackutil.SendSlackMessage(ctx, *connectorID, *message, db, smClient, slackClient)
