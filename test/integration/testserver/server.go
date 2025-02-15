@@ -17,6 +17,7 @@ import (
 	"github.com/connector-recruitment/internal/infrastructure/redis"
 	"github.com/connector-recruitment/pkg/logger"
 	"github.com/connector-recruitment/pkg/resilience"
+
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 
 	httpTransport "github.com/connector-recruitment/internal/transport/http"
@@ -73,8 +74,7 @@ func NewPostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 				FileMode:          0644,
 			},
 		},
-		WaitingFor: wait.ForLog("database system is ready to accept connections").
-			WithStartupTimeout(60 * time.Second),
+		WaitingFor: wait.ForListeningPort("5432/tcp"),
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -316,7 +316,7 @@ func SetupIntegrationTestServer(t *testing.T) *IntegrationTestServer {
 		connector.WithOAuthManager(oauthManager))
 
 	//---------------------------------------------------------------------
-	// gRPC Setup with additional logging for debugging
+	// gRPC Setup
 	//---------------------------------------------------------------------
 	grpcSvcHandler := grpcHandler.NewHandler(svc)
 
