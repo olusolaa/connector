@@ -17,7 +17,6 @@ import (
 	"github.com/connector-recruitment/internal/infrastructure/redis"
 	"github.com/connector-recruitment/pkg/logger"
 	"github.com/connector-recruitment/pkg/resilience"
-
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 
 	httpTransport "github.com/connector-recruitment/internal/transport/http"
@@ -74,7 +73,8 @@ func NewPostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 				FileMode:          0644,
 			},
 		},
-		WaitingFor: wait.ForListeningPort("5432/tcp"),
+		WaitingFor: wait.ForLog("database system is ready to accept connections").
+			WithStartupTimeout(60 * time.Second),
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -316,7 +316,7 @@ func SetupIntegrationTestServer(t *testing.T) *IntegrationTestServer {
 		connector.WithOAuthManager(oauthManager))
 
 	//---------------------------------------------------------------------
-	// gRPC Setup
+	// gRPC Setup with additional logging for debugging
 	//---------------------------------------------------------------------
 	grpcSvcHandler := grpcHandler.NewHandler(svc)
 
@@ -328,7 +328,9 @@ func SetupIntegrationTestServer(t *testing.T) *IntegrationTestServer {
 
 	conV1.RegisterConnectorServiceServer(grpcServer, grpcSvcHandler)
 
+	log.Println("Starting gRPC server on buf listener...")
 	go func() {
+		log.Println("gRPC server is serving on buf listener")
 		if err := grpcServer.Serve(bufListener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			t.Errorf("gRPC server exited with error: %v", err)
 		}
@@ -344,6 +346,7 @@ func SetupIntegrationTestServer(t *testing.T) *IntegrationTestServer {
 		return bufListener.Dial()
 	}
 
+	log.Println("Dialing gRPC server via buf listener...")
 	conn, err := grpc.NewClient("passthrough://bufnet",
 		grpc.WithContextDialer(dialer),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -356,6 +359,7 @@ func SetupIntegrationTestServer(t *testing.T) *IntegrationTestServer {
 			t.Errorf("failed to close gRPC connection: %v", err)
 		}
 	})
+	log.Println("gRPC connection established.")
 
 	//---------------------------------------------------------------------
 	// HTTP Setup
