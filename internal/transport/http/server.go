@@ -2,12 +2,12 @@ package http
 
 import (
 	"net/http"
-	"time"
 
+	"github.com/connector-recruitment/internal/app/config"
 	"github.com/connector-recruitment/internal/app/connector"
 )
 
-func NewHTTPServer(svc *connector.Service, oauthManager *connector.OAuthStateManager) *http.Server {
+func NewHTTPServer(svc *connector.Service, oauthManager *connector.OAuthStateManager, cfg *config.Config) *http.Server {
 	handler := NewHandler(svc, oauthManager)
 	mux := http.NewServeMux()
 
@@ -17,9 +17,9 @@ func NewHTTPServer(svc *connector.Service, oauthManager *connector.OAuthStateMan
 	return &http.Server{
 		Addr:              ":8080",
 		Handler:           mux,
-		ReadHeaderTimeout: 60 * time.Second,
-		ReadTimeout:       60 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
+		ReadHeaderTimeout: cfg.HTTPReadHeaderTimeout,
+		ReadTimeout:       cfg.HTTPReadTimeout,
+		WriteTimeout:      cfg.HTTPWriteTimeout,
+		IdleTimeout:       cfg.HTTPIdleTimeout,
 	}
 }

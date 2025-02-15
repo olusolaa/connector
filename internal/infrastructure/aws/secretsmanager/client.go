@@ -16,7 +16,7 @@ import (
 
 type ClientOption = func(*secretsmanager.Options)
 
-type SecretsManagerAPI interface {
+type ManagerAPI interface {
 	CreateSecret(ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error)
 	PutSecretValue(ctx context.Context, params *secretsmanager.PutSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.PutSecretValueOutput, error)
 	GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
@@ -24,7 +24,7 @@ type SecretsManagerAPI interface {
 }
 
 type Client struct {
-	client SecretsManagerAPI
+	client ManagerAPI
 }
 
 func WithRetryMaxAttempts(attempts int) ClientOption {
@@ -44,14 +44,30 @@ func WithRetryMaxBackoff(duration time.Duration) ClientOption {
 }
 
 func NewClient(cfg aws.Config, opts ...ClientOption) domain.SecretsManager {
-	options := []func(*secretsmanager.Options){
-		func(o *secretsmanager.Options) {
+	hasRetryOptions := false
+	for _, opt := range opts {
+		optFunc := opt
+		if optFunc != nil {
+			dummyOpts := &secretsmanager.Options{}
+			optFunc(dummyOpts)
+			if dummyOpts.Retryer != nil {
+				hasRetryOptions = true
+				break
+			}
+		}
+	}
+
+	var options []func(*secretsmanager.Options)
+
+	if !hasRetryOptions {
+		options = append(options, func(o *secretsmanager.Options) {
 			o.Retryer = retry.NewStandard(func(so *retry.StandardOptions) {
 				so.MaxAttempts = 3
 				so.MaxBackoff = 30 * time.Second
 			})
-		},
+		})
 	}
+
 	options = append(options, opts...)
 
 	return &Client{
