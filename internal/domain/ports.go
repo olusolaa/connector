@@ -11,7 +11,7 @@ type ConnectorRepository interface {
 	Create(ctx context.Context, c *Connector) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Connector, error)
 	Delete(ctx context.Context, id uuid.UUID) error
-	ListConnectors(ctx context.Context, limit int, cursor *ListCursor) ([]*Connector, *ListCursor, error)
+	ListConnectors(ctx context.Context, limit int, cursor *ListCursor) ([]Connector, *ListCursor, error)
 	UpdateConnector(ctx context.Context, id uuid.UUID, token string) error
 }
 
