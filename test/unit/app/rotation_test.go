@@ -34,7 +34,7 @@ func TestRotationService_Start(t *testing.T) {
 			},
 			setupMocks: func(repo *mocks2.MockConnectorRepository, sm *mocks2.MockSecretsManager) {
 				repo.On("ListConnectors", mock.Anything, mock.Anything, mock.Anything).
-					Return([]*domain.Connector{
+					Return([]domain.Connector{
 						{
 							ID:               uuid.New(),
 							WorkspaceID:      "workspace1",
@@ -82,7 +82,7 @@ func TestRotationService_Start(t *testing.T) {
 			},
 			setupMocks: func(repo *mocks2.MockConnectorRepository, sm *mocks2.MockSecretsManager) {
 				repo.On("ListConnectors", mock.Anything, mock.Anything, mock.Anything).
-					Return([]*domain.Connector{
+					Return([]domain.Connector{
 						{
 							ID:               uuid.New(),
 							WorkspaceID:      "workspace1",

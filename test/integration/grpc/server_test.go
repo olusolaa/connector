@@ -12,7 +12,6 @@ import (
 
 func TestConnectorServiceGRPC(t *testing.T) {
 	server := testserver.SetupIntegrationTestServer(t)
-	defer server.CleanupFunc()
 
 	ctx := context.Background()
 	client := connV1.NewConnectorServiceClient(server.GrpcConn)

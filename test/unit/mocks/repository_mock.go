@@ -31,12 +31,12 @@ func (m *MockConnectorRepository) Delete(ctx context.Context, id uuid.UUID) erro
 	return args.Error(0)
 }
 
-func (m *MockConnectorRepository) ListConnectors(ctx context.Context, limit int, cursor *domain.ListCursor) ([]*domain.Connector, *domain.ListCursor, error) {
+func (m *MockConnectorRepository) ListConnectors(ctx context.Context, limit int, cursor *domain.ListCursor) ([]domain.Connector, *domain.ListCursor, error) {
 	args := m.Called(ctx, limit, cursor)
 	if args.Get(0) == nil {
 		return nil, nil, args.Error(2)
 	}
-	return args.Get(0).([]*domain.Connector), args.Get(1).(*domain.ListCursor), args.Error(2)
+	return args.Get(0).([]domain.Connector), args.Get(1).(*domain.ListCursor), args.Error(2)
 }
 
 func (m *MockConnectorRepository) UpdateConnector(ctx context.Context, id uuid.UUID, token string) error {

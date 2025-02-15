@@ -25,9 +25,9 @@ func TestGRPCError(t *testing.T) {
 		},
 		{
 			name:          "connector not found error",
-			err:           connector.ErrConnectorNotFound,
+			err:           connector.ErrNotFound,
 			expectedCode:  codes.NotFound,
-			expectedError: connector.ErrConnectorNotFound.Error(),
+			expectedError: connector.ErrNotFound.Error(),
 		},
 		{
 			name:          "wrapped invalid input error",
@@ -37,9 +37,9 @@ func TestGRPCError(t *testing.T) {
 		},
 		{
 			name:          "wrapped not found error",
-			err:           errors.Join(errors.New("wrapped"), connector.ErrConnectorNotFound),
+			err:           errors.Join(errors.New("wrapped"), connector.ErrNotFound),
 			expectedCode:  codes.NotFound,
-			expectedError: "wrapped\nconnector not found",
+			expectedError: "wrapped\nrecord not found",
 		},
 		{
 			name:          "unknown error",

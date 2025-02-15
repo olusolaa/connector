@@ -10,7 +10,6 @@ import (
 
 func TestHealthCheck(t *testing.T) {
 	srv := testserver.SetupIntegrationTestServer(t)
-	defer srv.CleanupFunc()
 
 	resp, err := http.Get(srv.HTTPAddress + "/health")
 	if err != nil {
@@ -25,7 +24,6 @@ func TestHealthCheck(t *testing.T) {
 
 func TestOAuthCallback_Success(t *testing.T) {
 	srv := testserver.SetupIntegrationTestServer(t)
-	defer srv.CleanupFunc()
 
 	state, err := srv.OAuthManager.GenerateState(context.Background())
 	if err != nil {
