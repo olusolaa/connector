@@ -2,15 +2,15 @@ package slackutil
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 
 	"github.com/connector-recruitment/internal/domain"
 	pgRepo "github.com/connector-recruitment/internal/infrastructure/postgres"
+	"github.com/jmoiron/sqlx"
 )
 
-func SendSlackMessage(ctx context.Context, connectorID string, message string, db *sql.DB, smClient domain.SecretsManager, slackClient domain.SlackClient) error {
+func SendSlackMessage(ctx context.Context, connectorID string, message string, db *sqlx.DB, smClient domain.SecretsManager, slackClient domain.SlackClient) error {
 	repository := pgRepo.NewConnectorRepository(db)
 	id, err := domain.ParseUUID(connectorID)
 	if err != nil {
