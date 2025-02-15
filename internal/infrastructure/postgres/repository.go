@@ -9,13 +9,14 @@ import (
 
 	"github.com/connector-recruitment/internal/domain"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 )
 
 type ConnectorRepository struct {
-	db *sql.DB
+	db *sqlx.DB
 }
 
-func NewConnectorRepository(db *sql.DB) domain.ConnectorRepository {
+func NewConnectorRepository(db *sqlx.DB) domain.ConnectorRepository {
 	return &ConnectorRepository{db: db}
 }
 
@@ -23,12 +24,9 @@ func (r *ConnectorRepository) Create(ctx context.Context, c *domain.Connector) e
 	query := `
         INSERT INTO connectors 
         (id, workspace_id, tenant_id, default_channel_id, created_at, updated_at, secret_version)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES (:id, :workspace_id, :tenant_id, :default_channel_id, :created_at, :updated_at, :secret_version)
     `
-	_, err := r.db.ExecContext(ctx, query,
-		c.ID, c.WorkspaceID, c.TenantID, c.DefaultChannelID,
-		c.CreatedAt, c.UpdatedAt, c.SecretVersion,
-	)
+	_, err := r.db.NamedExecContext(ctx, query, c)
 	return err
 }
 
@@ -38,9 +36,8 @@ func (r *ConnectorRepository) GetByID(ctx context.Context, id uuid.UUID) (*domai
         FROM connectors
         WHERE id = $1
     `
-	row := r.db.QueryRowContext(ctx, query, id)
 	var conn domain.Connector
-	if err := row.Scan(&conn.ID, &conn.WorkspaceID, &conn.TenantID, &conn.DefaultChannelID, &conn.CreatedAt, &conn.UpdatedAt, &conn.SecretVersion); err != nil {
+	if err := r.db.GetContext(ctx, &conn, query, id); err != nil {
 		return nil, err
 	}
 	return &conn, nil
@@ -52,7 +49,7 @@ func (r *ConnectorRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-func (r *ConnectorRepository) ListConnectors(ctx context.Context, limit int, cursor *domain.ListCursor) ([]*domain.Connector, *domain.ListCursor, error) {
+func (r *ConnectorRepository) ListConnectors(ctx context.Context, limit int, cursor *domain.ListCursor) ([]domain.Connector, *domain.ListCursor, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -73,31 +70,10 @@ func (r *ConnectorRepository) ListConnectors(ctx context.Context, limit int, cur
 		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
 	query += " ORDER BY updated_at ASC, id ASC LIMIT $" + strconv.Itoa(len(args)+1)
-	args = append(args, limit+1) // one extra to see if there's more
+	args = append(args, limit+1)
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer rows.Close()
-
-	var connectors []*domain.Connector
-	for rows.Next() {
-		var conn domain.Connector
-		if err := rows.Scan(
-			&conn.ID,
-			&conn.WorkspaceID,
-			&conn.TenantID,
-			&conn.DefaultChannelID,
-			&conn.CreatedAt,
-			&conn.UpdatedAt,
-			&conn.SecretVersion,
-		); err != nil {
-			return nil, nil, err
-		}
-		connectors = append(connectors, &conn)
-	}
-	if err = rows.Err(); err != nil {
+	var connectors []domain.Connector
+	if err := r.db.SelectContext(ctx, &connectors, query, args...); err != nil {
 		return nil, nil, err
 	}
 
