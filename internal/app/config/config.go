@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
@@ -23,6 +25,29 @@ type Config struct {
 	SlackRedirectURL  string
 	RedisAddr         string
 	SlackScopes       string
+	// Slack retry configuration
+	SlackRetryMax       int
+	SlackRetryWait      time.Duration
+	SlackRateLimitRPS   float64
+	SlackRateLimitBurst int
+	// AWS retry configuration
+	AWSRetryMaxAttempts int
+	AWSRetryMaxBackoff  time.Duration
+	// HTTP Server timeouts
+	HTTPReadHeaderTimeout time.Duration
+	HTTPReadTimeout       time.Duration
+	HTTPWriteTimeout      time.Duration
+	HTTPIdleTimeout       time.Duration
+	// Circuit breaker configuration
+	CircuitBreakerInterval time.Duration
+	CircuitBreakerTimeout  time.Duration
+	// OAuth configuration
+	OAuthStateTimeout time.Duration
+	// Database configuration
+	DBConnMaxLifetime time.Duration
+	DBMaxIdleConns    int
+	DBMaxOpenConns    int
+	RedisDB           int
 }
 
 func LoadConfig() (*Config, error) {
@@ -41,6 +66,29 @@ func LoadConfig() (*Config, error) {
 		SlackRedirectURL:  os.Getenv("SLACK_REDIRECT_URL"),
 		RedisAddr:         getEnv("REDIS_ADDR", "localhost:6379"),
 		SlackScopes:       getEnv("SLACK_SCOPES", "chat:write,channels:read,groups:read"),
+		// Slack retry configuration with defaults
+		SlackRetryMax:       getEnvInt("SLACK_RETRY_MAX", 3),
+		SlackRetryWait:      time.Duration(getEnvInt("SLACK_RETRY_WAIT_SECONDS", 5)) * time.Second,
+		SlackRateLimitRPS:   getEnvFloat("SLACK_RATE_LIMIT_RPS", 1.0),
+		SlackRateLimitBurst: getEnvInt("SLACK_RATE_LIMIT_BURST", 3),
+		// AWS retry configuration with defaults
+		AWSRetryMaxAttempts: getEnvInt("AWS_RETRY_MAX_ATTEMPTS", 5),
+		AWSRetryMaxBackoff:  time.Duration(getEnvInt("AWS_RETRY_MAX_BACKOFF_SECONDS", 60)) * time.Second,
+		// HTTP Server timeouts
+		HTTPReadHeaderTimeout: time.Duration(getEnvInt("HTTP_READ_HEADER_TIMEOUT_SECONDS", 60)) * time.Second,
+		HTTPReadTimeout:       time.Duration(getEnvInt("HTTP_READ_TIMEOUT_SECONDS", 60)) * time.Second,
+		HTTPWriteTimeout:      time.Duration(getEnvInt("HTTP_WRITE_TIMEOUT_SECONDS", 60)) * time.Second,
+		HTTPIdleTimeout:       time.Duration(getEnvInt("HTTP_IDLE_TIMEOUT_SECONDS", 120)) * time.Second,
+		// Circuit breaker configuration
+		CircuitBreakerInterval: time.Duration(getEnvInt("CIRCUIT_BREAKER_INTERVAL_SECONDS", 60)) * time.Second,
+		CircuitBreakerTimeout:  time.Duration(getEnvInt("CIRCUIT_BREAKER_TIMEOUT_SECONDS", 30)) * time.Second,
+		// OAuth configuration
+		OAuthStateTimeout: time.Duration(getEnvInt("OAUTH_STATE_TIMEOUT_MINUTES", 15)) * time.Minute,
+		// Database configuration
+		DBConnMaxLifetime: time.Duration(getEnvInt("DB_CONN_MAX_LIFETIME_MINUTES", 5)) * time.Minute,
+		DBMaxIdleConns:    getEnvInt("DB_MAX_IDLE_CONNS", 10),
+		DBMaxOpenConns:    getEnvInt("DB_MAX_OPEN_CONNS", 100),
+		RedisDB:           getEnvInt("REDIS_DB", 0),
 	}
 
 	if cfg.SlackClientID == "" || cfg.SlackClientSecret == "" || cfg.SlackRedirectURL == "" {
@@ -53,6 +101,24 @@ func LoadConfig() (*Config, error) {
 func getEnv(key, defaultVal string) string {
 	if val, exists := os.LookupEnv(key); exists {
 		return val
+	}
+	return defaultVal
+}
+
+func getEnvInt(key string, defaultVal int) int {
+	if val, exists := os.LookupEnv(key); exists {
+		if intVal, err := strconv.Atoi(val); err == nil {
+			return intVal
+		}
+	}
+	return defaultVal
+}
+
+func getEnvFloat(key string, defaultVal float64) float64 {
+	if val, exists := os.LookupEnv(key); exists {
+		if floatVal, err := strconv.ParseFloat(val, 64); err == nil {
+			return floatVal
+		}
 	}
 	return defaultVal
 }
