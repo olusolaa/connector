@@ -138,7 +138,7 @@ Creates a new Slack connector with the specified configuration.
 ```json
 {
   "workspace_id": "7656730043137",
-  "tenant_id": "440",
+  "tenant_id": "your-organization-id",
   "token": "xoxb-7656730043137-8419596279637-p6icqGwKPLsewHC9eALXrjl3",
   "default_channel_name": "all-moneta"
 }
@@ -150,7 +150,7 @@ Creates a new Slack connector with the specified configuration.
   "connector": {
     "id": "0d2f2d58-c66d-442b-9dad-7b6793e21f8e",
     "workspace_id": "7656730043137",
-    "tenant_id": "440",
+    "tenant_id": "your-organization-id",
     "default_channel_id": "C07JRCP2S3Y",
     "created_at": "2024-02-09T12:54:17.035972Z",
     "updated_at": "2024-02-09T12:54:17.035972Z",
@@ -163,7 +163,7 @@ Creates a new Slack connector with the specified configuration.
 ```bash
 grpcurl -plaintext -d '{
   "workspace_id": "7656730043137",
-  "tenant_id": "440",
+  "tenant_id": "your-organization-id",
   "token": "xoxb-7656730043137-8419596279637-p6icqGwKPLsewHC9eALXrjl3",
   "default_channel_name": "all-moneta"
 }' localhost:50051 connector.v1.ConnectorService/CreateConnector
@@ -186,7 +186,7 @@ Retrieves a connector by its ID.
   "connector": {
     "id": "0d2f2d58-c66d-442b-9dad-7b6793e21f8e",
     "workspace_id": "7656730043137",
-    "tenant_id": "440",
+    "tenant_id": "your-organization-id",
     "default_channel_id": "C07JRCP2S3Y",
     "created_at": "2024-02-09T12:54:17.035972Z",
     "updated_at": "2024-02-09T12:54:17.035972Z",
@@ -210,7 +210,7 @@ Deletes a connector and its associated resources.
 {
   "id": "0d2f2d58-c66d-442b-9dad-7b6793e21f8e",
   "workspace_id": "7656730043137",
-  "tenant_id": "440"
+  "tenant_id": "your-organization-id"
 }
 ```
 
@@ -226,7 +226,7 @@ Deletes a connector and its associated resources.
 grpcurl -plaintext -d '{
   "id": "0d2f2d58-c66d-442b-9dad-7b6793e21f8e",
   "workspace_id": "7656730043137",
-  "tenant_id": "440"
+  "tenant_id": "your-organization-id"
 }' localhost:50051 connector.v1.ConnectorService/DeleteConnector
 ```
 
@@ -282,7 +282,7 @@ a) Create a connector with valid token:
 ```bash
 grpcurl -plaintext -d '{
     "workspace_id": "7656730043137",
-    "tenant_id": "440",
+    "tenant_id": "your-organization-id",
     "token": "<token_from_oauth_exchange>",
     "default_channel_name": "all-moneta"
 }' localhost:50051 connector.v1.ConnectorService/CreateConnector
@@ -292,7 +292,7 @@ b) Try creating with invalid data (error case):
 ```bash
 grpcurl -plaintext -d '{
     "workspace_id": "",
-    "tenant_id": "440",
+    "tenant_id": "your-organization-id",
     "token": "invalid_token",
     "default_channel_name": ""
 }' localhost:50051 connector.v1.ConnectorService/CreateConnector
@@ -318,7 +318,7 @@ Delete the connector:
 grpcurl -plaintext -d '{
     "id": "<connector_id>",
     "workspace_id": "7656730043137",
-    "tenant_id": "440"
+    "tenant_id": "your-organization-id"
 }' localhost:50051 connector.v1.ConnectorService/DeleteConnector
 ```
 
@@ -330,7 +330,7 @@ The service includes proper error handling for various scenarios. Here are the t
 ```bash
 grpcurl -plaintext -d '{
     "workspace_id": "",
-    "tenant_id": "440",
+    "tenant_id": "your-organization-id",
     "token": "invalid_token",
     "default_channel_name": ""
 }' localhost:50051 connector.v1.ConnectorService/CreateConnector
@@ -354,7 +354,7 @@ go run go-server/cmd/cli/main.go send-message \
 grpcurl -plaintext -d '{
     "id": "00000000-0000-0000-0000-000000000000",
     "workspace_id": "7656730043137",
-    "tenant_id": "440"
+    "tenant_id": "your-organization-id"
 }' localhost:50051 connector.v1.ConnectorService/DeleteConnector
 ```
 
