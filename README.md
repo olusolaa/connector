@@ -119,10 +119,10 @@ Get OAuth URL and exchange code for token.
 **Example:**
 ```bash
 # Replace 50051 with the actual mapped gRPC port from docker-compose ps
-grpcurl -plaintext -emit-defaults \                                                                                                   
+grpcurl -plaintext\
     -d '{
         "redirect_uri": "https://localhost:8080/oauth/callback"
-    }' \                                
+    }' \
     localhost:50051 connector.v1.ConnectorService/GetOAuthV2URL | jq
 ```
 
@@ -146,7 +146,7 @@ grpcurl -plaintext -emit-defaults \
 ```bash
 # Replace 50051 with the actual mapped gRPC port from docker-compose ps
 grpcurl -plaintext -d '{"code": "received_oauth_code"}' \
-localhost:50051 connector.v1.ConnectorService/ExchangeOAuthCode
+localhost:50051 connector.v1.ConnectorService/ExchangeOAuthCode | jq
 ```
 
 ### 2. Create Connector
@@ -248,7 +248,7 @@ Deletes a connector and its associated resources.
 **Example:**
 ```bash
 # Replace 50051 with the actual mapped gRPC port from docker-compose ps
-grpcurl -plaintext -emit-defaults \                                                                                                   
+grpcurl -plaintext -emit-defaults \
     -d '{
         "id": "<connector_id>",
         "workspace_id": "7656730043137",
