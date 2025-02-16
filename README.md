@@ -33,6 +33,9 @@ A gRPC service that manages Slack connectors with secure token storage and Postg
 
    # Start the service
    ./setup.sh
+
+   # Check the actual port mappings (IMPORTANT)
+   docker-compose ps
    ```
 
 The setup script will:
@@ -40,6 +43,15 @@ The setup script will:
 - Prompt for Slack credentials (or use defaults)
 - Start all required services
 - Provide usage instructions
+
+**Important Note About Ports**: When Docker starts the services, it may map the default ports to different values to avoid conflicts:
+- gRPC Server: 50051 → may be mapped to another port (e.g., 50052)
+- HTTP Server: 8080 → may be mapped to another port (e.g., 8081)
+- LocalStack: 4566 → may be mapped to another port (e.g., 4567)
+- PostgreSQL: 5432 → may be mapped to another port (e.g., 5433)
+- Redis: 6379 → may be mapped to another port (e.g., 6380)
+
+Always check the actual port mappings using `docker-compose ps` before running any commands.
 
 ## Project Structure
 ```
@@ -79,6 +91,8 @@ Once running, the following services are available:
 - LocalStack: `localhost:4566`
 - PostgreSQL: `localhost:5432`
 - Redis: `localhost:6379`
+- 
+**Important**: When Docker starts the services, it may map the ports to different values to avoid conflicts. Always check the actual port mappings using `docker-compose ps`.
 
 ## Endpoints
 
@@ -104,8 +118,12 @@ Get OAuth URL and exchange code for token.
 
 **Example:**
 ```bash
-grpcurl -plaintext -d '{"redirect_uri": "https://localhost:8080/oauth/callback"}' \
-localhost:50051 connector.v1.ConnectorService/GetOAuthV2URL
+# Replace 50051 with the actual mapped gRPC port from docker-compose ps
+grpcurl -plaintext -emit-defaults \                                                                                                   
+    -d '{
+        "redirect_uri": "https://localhost:8080/oauth/callback"
+    }' \                                
+    localhost:50051 connector.v1.ConnectorService/GetOAuthV2URL | jq
 ```
 
 #### Exchange OAuth Code
@@ -126,6 +144,7 @@ localhost:50051 connector.v1.ConnectorService/GetOAuthV2URL
 
 **Example:**
 ```bash
+# Replace 50051 with the actual mapped gRPC port from docker-compose ps
 grpcurl -plaintext -d '{"code": "received_oauth_code"}' \
 localhost:50051 connector.v1.ConnectorService/ExchangeOAuthCode
 ```
@@ -161,10 +180,11 @@ Creates a new Slack connector with the specified configuration.
 
 **Example:**
 ```bash
+# Replace 50051 with the actual mapped gRPC port from docker-compose ps
 grpcurl -plaintext -d '{
   "workspace_id": "7656730043137",
   "tenant_id": "your-organization-id",
-  "token": "xoxb-7656730043137-8419596279637-p6icqGwKPLsewHC9eALXrjl3",
+  "token": "<token_from_oauth_exchange>",
   "default_channel_name": "all-moneta"
 }' localhost:50051 connector.v1.ConnectorService/CreateConnector
 ```
@@ -197,8 +217,12 @@ Retrieves a connector by its ID.
 
 **Example:**
 ```bash
-grpcurl -plaintext -d '{"id": "0d2f2d58-c66d-442b-9dad-7b6793e21f8e"}' \
-localhost:50051 connector.v1.ConnectorService/GetConnector
+# Replace 50051 with the actual mapped gRPC port from docker-compose ps
+grpcurl -plaintext -emit-defaults \
+    -d '{                 
+        "id": "<token_from_oauth_exchange>"
+    }' \
+    localhost:50051 connector.v1.ConnectorService/GetConnector | jq
 ```
 
 ### 4. Delete Connector
@@ -223,11 +247,14 @@ Deletes a connector and its associated resources.
 
 **Example:**
 ```bash
-grpcurl -plaintext -d '{
-  "id": "0d2f2d58-c66d-442b-9dad-7b6793e21f8e",
-  "workspace_id": "7656730043137",
-  "tenant_id": "your-organization-id"
-}' localhost:50051 connector.v1.ConnectorService/DeleteConnector
+# Replace 50051 with the actual mapped gRPC port from docker-compose ps
+grpcurl -plaintext -emit-defaults \                                                                                                   
+    -d '{
+        "id": "<connector_id>",
+        "workspace_id": "7656730043137",
+        "tenant_id": "440"
+    }' \
+    localhost:50051 connector.v1.ConnectorService/DeleteConnector | jq
 ```
 
 ### 5. CLI Tool
@@ -236,127 +263,23 @@ The service includes a CLI tool for sending messages to Slack channels through a
 
 **Usage:**
 ```bash
-go run go-server/cmd/cli/main.go --connector-id="<connector-id>" --message="<message>"
+DB_DSN="postgres://aryon:aryon@localhost:5433/aryondb?sslmode=disable" \
+AWS_ENDPOINT="http://localhost:4567" go run go-server/cmd/cli/main.go \
+--connector-id="50115dfb-23cb-4de4-b3db-77217c8c7c26" --message="Test message from connector service"
 ```
+
+**Note**: The port numbers (5433 for PostgreSQL, 4567 for LocalStack) might be different on your system. Use `docker-compose ps` to check the actual port mappings.
 
 **Parameters:**
 - `--connector-id`: The UUID of the connector to use (required)
 - `--message`: The message to send to the default Slack channel (required)
 
-**Example:**
-```bash
-go run go-server/cmd/cli/main.go \
-    --connector-id="0d2f2d58-c66d-442b-9dad-7b6793e21f8e" \
-    --message="Test message from connector service"
-```
+
 
 **Error Cases:**
 - If either `--connector-id` or `--message` is missing, the CLI will return an error
 - If the connector ID doesn't exist, the CLI will return an error
 - If the Slack token is invalid or expired, the CLI will return an error
-
-## Testing Guide
-
-### Prerequisites
-- Docker and Docker Compose running
-- Services started via `./setup.sh`
-- Access to a Slack workspace for OAuth testing
-
-### Complete Testing Flow
-
-#### Step 1: OAuth Flow
-a) Get OAuth URL and complete authentication:
-```bash
-grpcurl -plaintext -d '{"redirect_uri": "https://localhost:8080/oauth/callback"}' \
-    localhost:50051 connector.v1.ConnectorService/GetOAuthV2URL
-```
-
-b) Exchange the received code for a token:
-```bash
-grpcurl -plaintext -d '{"code": "<received_oauth_code>"}' \
-    localhost:50051 connector.v1.ConnectorService/ExchangeOAuthCode
-```
-
-#### Step 2: Connector Management
-a) Create a connector with valid token:
-```bash
-grpcurl -plaintext -d '{
-    "workspace_id": "7656730043137",
-    "tenant_id": "your-organization-id",
-    "token": "<token_from_oauth_exchange>",
-    "default_channel_name": "all-moneta"
-}' localhost:50051 connector.v1.ConnectorService/CreateConnector
-```
-
-b) Try creating with invalid data (error case):
-```bash
-grpcurl -plaintext -d '{
-    "workspace_id": "",
-    "tenant_id": "your-organization-id",
-    "token": "invalid_token",
-    "default_channel_name": ""
-}' localhost:50051 connector.v1.ConnectorService/CreateConnector
-```
-
-c) Get connector details:
-```bash
-grpcurl -plaintext -d '{"id": "<connector_id>"}' \
-    localhost:50051 connector.v1.ConnectorService/GetConnector
-```
-
-#### Step 3: Message Testing
-Send a test message using CLI:
-```bash
-go run go-server/cmd/cli/main.go send-message \
-    --connector-id="<connector_id>" \
-    --message="Test message from connector service"
-```
-
-#### Step 4: Cleanup Operations
-Delete the connector:
-```bash
-grpcurl -plaintext -d '{
-    "id": "<connector_id>",
-    "workspace_id": "7656730043137",
-    "tenant_id": "your-organization-id"
-}' localhost:50051 connector.v1.ConnectorService/DeleteConnector
-```
-
-### Error Cases
-
-The service includes proper error handling for various scenarios. Here are the test cases for error conditions:
-
-1. **Invalid Connector Creation**
-```bash
-grpcurl -plaintext -d '{
-    "workspace_id": "",
-    "tenant_id": "your-organization-id",
-    "token": "invalid_token",
-    "default_channel_name": ""
-}' localhost:50051 connector.v1.ConnectorService/CreateConnector
-```
-
-2. **Non-existent Connector Retrieval**
-```bash
-grpcurl -plaintext -d '{"id": "00000000-0000-0000-0000-000000000000"}' \
-    localhost:50051 connector.v1.ConnectorService/GetConnector
-```
-
-3. **Invalid Message Sending**
-```bash
-go run go-server/cmd/cli/main.go send-message \
-    --connector-id="00000000-0000-0000-0000-000000000000" \
-    --message="This should fail"
-```
-
-4. **Non-existent Connector Deletion**
-```bash
-grpcurl -plaintext -d '{
-    "id": "00000000-0000-0000-0000-000000000000",
-    "workspace_id": "7656730043137",
-    "tenant_id": "your-organization-id"
-}' localhost:50051 connector.v1.ConnectorService/DeleteConnector
-```
 
 ### Expected Results
 
@@ -417,17 +340,14 @@ docker-compose restart
 
 #### Run Tests
 ```bash
+# Run unit tests
+go test -v ./test/unit/...
+
+# Run integration tests
+go test -v ./test/integration/...
+
 # Run all tests
-docker-compose exec app go test ./...
-
-# Run tests with coverage
-docker-compose exec app go test -cover ./...
-```
-
-#### Generate Protocol Buffers
-```bash
-# Generate Go code from proto files
-docker-compose exec app buf generate
+go test -v ./...
 ```
 
 ## Troubleshooting
